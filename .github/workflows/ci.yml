@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware-avr:
+    name: baremetal AVR firmware (avr-gcc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AVR toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc binutils-avr
+
+      - name: Compile (.elf)
+        run: avr-g++ -mmcu=atmega328p -Os -std=c++17 -Wall -Wextra -o blink.elf blink.cpp
+
+      - name: Make flashable image (.hex) + size
+        run: |
+          avr-objcopy -O ihex -R .eeprom blink.elf blink.hex
+          avr-size -B blink.elf
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blink-atmega328p
+          path: |
+            blink.elf
+            blink.hex
